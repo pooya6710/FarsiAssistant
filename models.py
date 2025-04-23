@@ -1,6 +1,7 @@
-from sqlalchemy import Column, Integer, String, ForeignKey, create_engine, JSON
+from sqlalchemy import Column, Integer, String, ForeignKey, create_engine, JSON, Boolean, DateTime, Text
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship, sessionmaker
+from datetime import datetime
 import os
 import json
 
@@ -13,6 +14,8 @@ class Student(Base):
     id = Column(Integer, primary_key=True)
     user_id = Column(String, unique=True, nullable=False)  # شناسه کاربری تلگرام
     feeding_code = Column(String, unique=True, nullable=False)  # کد تغذیه
+    phone = Column(String, nullable=True)  # شماره تلفن برای اطلاع‌رسانی‌ها (اختیاری)
+    registration_date = Column(DateTime, default=datetime.now)  # تاریخ ثبت‌نام
     
     # ارتباط یک به چند با رزروها
     reservations = relationship("Reservation", back_populates="student", cascade="all, delete-orphan")
@@ -29,12 +32,15 @@ class Reservation(Base):
     day = Column(String, nullable=False)  # روز هفته (شنبه، یکشنبه، ...)
     meal_type = Column(String, nullable=False)  # نوع وعده غذایی (صبحانه، ناهار، شام)
     food = Column(String, nullable=False)  # نام غذا
+    is_delivered = Column(Boolean, default=False)  # وضعیت تحویل غذا
+    delivery_time = Column(DateTime, nullable=True)  # زمان تحویل غذا
+    reservation_time = Column(DateTime, default=datetime.now)  # زمان ثبت رزرو
     
     # ارتباط با جدول دانشجویان
     student = relationship("Student", back_populates="reservations")
     
     def __repr__(self):
-        return f"<Reservation(student_id={self.student_id}, day={self.day}, meal_type={self.meal_type}, food={self.food})>"
+        return f"<Reservation(student_id={self.student_id}, day={self.day}, meal_type={self.meal_type}, food={self.food}, delivered={self.is_delivered})>"
 
 # کلاس منو برای نگهداری منوی غذای هفتگی
 class Menu(Base):
@@ -43,9 +49,23 @@ class Menu(Base):
     id = Column(Integer, primary_key=True)
     day = Column(String, nullable=False)  # روز هفته
     meal_data = Column(JSON, nullable=False)  # اطلاعات وعده‌های غذایی در قالب JSON
+    updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now)  # زمان آخرین به‌روزرسانی
     
     def __repr__(self):
         return f"<Menu(day={self.day}, meal_data={self.meal_data})>"
+
+# کلاس جدید برای بک‌آپ‌های دیتابیس
+class DatabaseBackup(Base):
+    __tablename__ = 'backups'
+    
+    id = Column(Integer, primary_key=True)
+    filename = Column(String, nullable=False)  # نام فایل بک‌آپ
+    created_at = Column(DateTime, default=datetime.now)  # زمان ایجاد بک‌آپ
+    description = Column(Text, nullable=True)  # توضیحات (اختیاری)
+    size = Column(Integer, nullable=True)  # سایز فایل بک‌آپ (بایت)
+    
+    def __repr__(self):
+        return f"<DatabaseBackup(filename={self.filename}, created_at={self.created_at})>"
 
 # تابع برای ایجاد اتصال به دیتابیس و جداول
 def init_db():
