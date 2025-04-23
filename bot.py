@@ -2,12 +2,14 @@ import asyncio
 import logging
 import json
 import os
+import datetime
+import subprocess
 from dotenv import load_dotenv
 from jdatetime import date as JalaliDate
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, BotCommand
 from telegram.ext import Updater, CommandHandler, CallbackQueryHandler, CallbackContext, MessageHandler, Filters, ConversationHandler
 import nest_asyncio
-from models import init_db, Student, Reservation, Menu, load_default_menu, migrate_from_json_to_db
+from models import init_db, Student, Reservation, Menu, DatabaseBackup, load_default_menu, migrate_from_json_to_db
 
 # بارگذاری متغیرهای محیطی از فایل .env
 load_dotenv()
@@ -46,6 +48,10 @@ OWNER_CHAT_IDS = [286420965]  # با شناسه‌های چت واقعی مدی�
 
 # وضعیت‌ها برای مدیریت مکالمه
 FEEDING_CODE = 0
+EDIT_MENU_DAY = 1
+EDIT_MENU_MEAL = 2
+EDIT_MENU_FOOD = 3
+DATABASE_BACKUP_DESC = 4
 
 # ایجاد اتصال به دیتابیس
 db_session = init_db()
@@ -108,6 +114,14 @@ def main_menu(update: Update, context: CallbackContext) -> None:
         [InlineKeyboardButton("\U0001F4C5 مشاهده رزروها", callback_data="show_reservations")],
         [InlineKeyboardButton("\U0001F4DA راهنما", callback_data="help")]
     ]
+    
+    # اضافه کردن منوی مدیریت برای مدیران سیستم
+    chat_id = update.effective_chat.id
+    if is_owner(chat_id):
+        menu_keyboard.append([
+            InlineKeyboardButton("\U0001F680 پنل مدیریت", callback_data="admin_panel")
+        ])
+    
     reply_markup = InlineKeyboardMarkup(menu_keyboard)
     welcome_message = (
         "\U0001F44B خوش آمدید به سامانه رزرو غذای دانشگاه!\n"

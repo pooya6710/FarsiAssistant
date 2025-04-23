@@ -49,7 +49,6 @@ class Menu(Base):
     id = Column(Integer, primary_key=True)
     day = Column(String, nullable=False)  # روز هفته
     meal_data = Column(JSON, nullable=False)  # اطلاعات وعده‌های غذایی در قالب JSON
-    updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now)  # زمان آخرین به‌روزرسانی
     
     def __repr__(self):
         return f"<Menu(day={self.day}, meal_data={self.meal_data})>"
@@ -73,7 +72,12 @@ def init_db():
     engine = create_engine(database_url)
     Base.metadata.create_all(engine)
     Session = sessionmaker(bind=engine)
-    return Session()
+    session = Session()
+    
+    # مهاجرت و به‌روزرسانی ساختار دیتابیس
+    migrate_database_schema(session, engine)
+    
+    return session
 
 # تابع برای بارگذاری منوی پیش‌فرض به دیتابیس
 def load_default_menu(session):
@@ -99,6 +103,47 @@ def load_default_menu(session):
         session.add(menu_item)
     
     session.commit()
+
+# تابع برای ایجاد یا به‌روزرسانی ساختار دیتابیس
+def migrate_database_schema(session, engine):
+    import sqlalchemy as sa
+    from sqlalchemy import inspect
+    
+    # بررسی ستون‌های موجود در جدول رزروها
+    inspector = inspect(engine)
+    reservation_columns = [column['name'] for column in inspector.get_columns('reservations')]
+    student_columns = [column['name'] for column in inspector.get_columns('students')]
+    
+    # اضافه کردن ستون‌های مورد نیاز به جدول رزروها
+    with engine.connect() as connection:
+        if 'is_delivered' not in reservation_columns:
+            connection.execute(sa.text("ALTER TABLE reservations ADD COLUMN is_delivered BOOLEAN DEFAULT FALSE"))
+        
+        if 'delivery_time' not in reservation_columns:
+            connection.execute(sa.text("ALTER TABLE reservations ADD COLUMN delivery_time TIMESTAMP"))
+        
+        if 'reservation_time' not in reservation_columns:
+            connection.execute(sa.text("ALTER TABLE reservations ADD COLUMN reservation_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP"))
+        
+        # اضافه کردن ستون‌های مورد نیاز به جدول دانشجویان
+        if 'phone' not in student_columns:
+            connection.execute(sa.text("ALTER TABLE students ADD COLUMN phone VARCHAR"))
+        
+        if 'registration_date' not in student_columns:
+            connection.execute(sa.text("ALTER TABLE students ADD COLUMN registration_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP"))
+        
+        # ایجاد جدول بک‌آپ اگر وجود نداشته باشد
+        connection.execute(sa.text("""
+            CREATE TABLE IF NOT EXISTS backups (
+                id SERIAL PRIMARY KEY,
+                filename VARCHAR NOT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                description TEXT,
+                size INTEGER
+            )
+        """))
+        
+        connection.commit()
 
 # تابع برای انتقال داده‌های از فایل JSON به دیتابیس
 def migrate_from_json_to_db(json_file, session):
