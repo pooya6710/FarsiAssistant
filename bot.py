@@ -7,6 +7,7 @@ from jdatetime import date as JalaliDate
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, BotCommand
 from telegram.ext import Updater, CommandHandler, CallbackQueryHandler, CallbackContext, MessageHandler, Filters, ConversationHandler
 import nest_asyncio
+from models import init_db, Student, Reservation, Menu, load_default_menu, migrate_from_json_to_db
 
 # بارگذاری متغیرهای محیطی از فایل .env
 load_dotenv()
@@ -19,21 +20,7 @@ logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s
                     level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# دیکشنری برای ذخیره اطلاعات دانشجویان - نگاشت user_id به feeding_code
-students = {}
-
-# دیکشنری برای ذخیره منوی هفتگی
-menu_data = {
-    "saturday": {"breakfast": "تخم مرغ", "lunch": "چلوکباب", "dinner": "سوپ"},
-    "sunday": {"breakfast": "پنیر و گردو", "lunch": "خورشت قورمه سبزی", "dinner": "ماکارونی"},
-    "monday": {"breakfast": "املت", "lunch": "چلو مرغ", "dinner": "کتلت"},
-    "tuesday": {"breakfast": "عدسی", "lunch": "خورشت قیمه", "dinner": "کوکو سبزی"},
-    "wednesday": {"breakfast": "کره و مربا", "lunch": "آبگوشت", "dinner": "پیتزا"},
-    "thursday": {"breakfast": "نان و پنیر", "lunch": "چلو ماهی", "dinner": "سوپ"},
-    "friday": {"breakfast": "حلوا ارده", "lunch": "خورشت فسنجان", "dinner": "ساندویچ"}
-}
-
-# فایل برای ذخیره رزروها
+# فایل قبلی رزروها (برای مهاجرت)
 RESERVATION_FILE = "reservations.json"
 
 # نگاشت روزهای فارسی
@@ -60,51 +47,41 @@ OWNER_CHAT_IDS = [286420965]  # با شناسه‌های چت واقعی مدی�
 # وضعیت‌ها برای مدیریت مکالمه
 FEEDING_CODE = 0
 
-# بارگذاری رزروها از فایل
-def load_reservations():
-    try:
-        with open(RESERVATION_FILE, "r", encoding="utf-8") as file:
-            data = json.load(file)
-            # تبدیل کلیدهای فارسی به انگلیسی برای استفاده داخلی
-            converted_data = {}
-            for feeding_code, days in data.items():
-                english_days_data = {}
-                persian_to_english_days = {v: k for k, v in persian_days.items()}
-                persian_to_english_meals = {v: k for k, v in persian_meals.items()}
-                
-                for day, meals in days.items():
-                    english_day = persian_to_english_days.get(day, day)
-                    english_meals_data = {persian_to_english_meals.get(meal, meal): name for meal, name in meals.items()}
-                    english_days_data[english_day] = english_meals_data
-                
-                converted_data[feeding_code] = english_days_data
-            
-            return converted_data
-    except (FileNotFoundError, json.JSONDecodeError):
-        # اگر فایل وجود نداشت یا نامعتبر بود، دیکشنری خالی برگردان
-        return {}
+# ایجاد اتصال به دیتابیس
+db_session = init_db()
 
-# ذخیره رزروها در فایل
-def save_reservations(reservations):
-    # تبدیل کلیدهای انگلیسی به فارسی قبل از ذخیره
-    persian_reservations = {}
-    for feeding_code, days in reservations.items():
-        persian_days_data = {}
-        for day, meals in days.items():
-            persian_day = persian_days.get(day, day)
-            persian_meals_data = {persian_meals.get(meal, meal): value for meal, value in meals.items()}
-            persian_days_data[persian_day] = persian_meals_data
-        persian_reservations[feeding_code] = persian_days_data
+# بارگذاری منوی پیش‌فرض به دیتابیس
+load_default_menu(db_session)
 
-    with open(RESERVATION_FILE, "w", encoding="utf-8") as file:
-        json.dump(persian_reservations, file, ensure_ascii=False, indent=4)
+# مهاجرت داده‌ها از فایل JSON به دیتابیس (اگر فایل وجود داشته باشد)
+migrate_from_json_to_db(RESERVATION_FILE, db_session)
+
+# دیکشنری موقت برای کش کردن کد تغذیه‌ها (شناسه کاربری به کد تغذیه)
+students = {}
+
+# بارگذاری دانشجویان از دیتابیس به کش
+def load_students_to_cache():
+    all_students = db_session.query(Student).all()
+    for student in all_students:
+        students[student.user_id] = student.feeding_code
+
+# بارگذاری دانشجویان به کش در شروع کار
+load_students_to_cache()
+
+# بارگذاری منوی غذا از دیتابیس
+def get_menu_data():
+    menu_items = db_session.query(Menu).all()
+    menu_data = {}
+    for item in menu_items:
+        menu_data[item.day] = item.meal_data
+    return menu_data
+
+# دریافت منوی غذا
+menu_data = get_menu_data()
 
 # بررسی اینکه آیا کاربر مدیر است یا خیر
 def is_owner(chat_id):
     return chat_id in OWNER_CHAT_IDS
-
-# مقداردهی اولیه رزروها
-reservations = load_reservations()
 
 # تابع‌های پردازش دستورها
 def start(update: Update, context: CallbackContext) -> None:
@@ -174,11 +151,23 @@ def process_feeding_code(update: Update, context: CallbackContext) -> int:
     code = update.message.text.strip()
     
     if code.isdigit():
-        student_id = str(update.effective_user.id)
-        students[student_id] = code
-        if code not in reservations:
-            reservations[code] = {}
-        save_reservations(reservations)
+        user_id = str(update.effective_user.id)
+        
+        # بررسی اینکه آیا دانشجو قبلاً در دیتابیس وجود دارد
+        student = db_session.query(Student).filter_by(user_id=user_id).first()
+        
+        if student:
+            # به‌روزرسانی کد تغذیه دانشجو
+            student.feeding_code = code
+        else:
+            # ایجاد دانشجوی جدید
+            student = Student(user_id=user_id, feeding_code=code)
+            db_session.add(student)
+        
+        db_session.commit()
+        
+        # به‌روزرسانی کش
+        students[user_id] = code
         
         update.message.reply_text(
             f"\U00002705 کد تغذیه شما ({code}) با موفقیت ثبت شد!\n"
@@ -234,22 +223,41 @@ def show_reservations(update: Update, context: CallbackContext) -> None:
     else:
         feeding_code = students[user_id]
         
-        if feeding_code not in reservations or not reservations[feeding_code]:
-            message = "\U0001F4C5 شما هیچ رزروی ندارید. لطفاً از منوی غذا، وعده‌های مورد نظر خود را رزرو کنید."
-            keyboard = [[InlineKeyboardButton("\U0001F4D6 مشاهده منو", callback_data="view_menu")]]
+        # دریافت دانشجو از دیتابیس
+        student = db_session.query(Student).filter_by(feeding_code=feeding_code).first()
+        
+        if not student:
+            message = "\U0001F6AB خطا در بازیابی اطلاعات شما. لطفاً دوباره کد تغذیه خود را ثبت کنید."
+            keyboard = [[InlineKeyboardButton("\U0001F4DD ثبت کد تغذیه", callback_data="register")]]
         else:
-            message = f"<b>\U0001F4C5 رزروهای شما با کد تغذیه {feeding_code}:</b>\n\n"
-            user_reservations = reservations[feeding_code]
+            # دریافت رزروهای دانشجو از دیتابیس
+            reservations = db_session.query(Reservation).filter_by(student_id=student.id).all()
             
-            for day, meals in user_reservations.items():
-                persian_day = persian_days.get(day, day)
-                message += f"<b>\U0001F4C6 روز {persian_day}:</b>\n"
-                for meal, food in meals.items():
-                    persian_meal = persian_meals.get(meal, meal)
-                    message += f"  \U0001F374 {persian_meal}: {food}\n"
-                message += "\n"
+            if not reservations:
+                message = "\U0001F4C5 شما هیچ رزروی ندارید. لطفاً از منوی غذا، وعده‌های مورد نظر خود را رزرو کنید."
+                keyboard = [[InlineKeyboardButton("\U0001F4D6 مشاهده منو", callback_data="view_menu")]]
+            else:
+                message = f"<b>\U0001F4C5 رزروهای شما با کد تغذیه {feeding_code}:</b>\n\n"
                 
-            keyboard = []
+                # گروه‌بندی رزروها بر اساس روز
+                reservations_by_day = {}
+                for reservation in reservations:
+                    if reservation.day not in reservations_by_day:
+                        reservations_by_day[reservation.day] = []
+                    reservations_by_day[reservation.day].append(reservation)
+                
+                # نمایش رزروها به صورت گروه‌بندی شده بر اساس روز
+                for day, day_reservations in reservations_by_day.items():
+                    persian_day = persian_days.get(day, day)
+                    message += f"<b>\U0001F4C6 روز {persian_day}:</b>\n"
+                    
+                    for reservation in day_reservations:
+                        persian_meal = persian_meals.get(reservation.meal_type, reservation.meal_type)
+                        message += f"  \U0001F374 {persian_meal}: {reservation.food}\n"
+                    
+                    message += "\n"
+                
+                keyboard = []
     
     keyboard.append([InlineKeyboardButton("\U0001F519 بازگشت به منوی اصلی", callback_data="back_to_menu")])
     reply_markup = InlineKeyboardMarkup(keyboard)
@@ -328,39 +336,76 @@ def handle_callback(update: Update, context: CallbackContext) -> None:
         
         feeding_code = students[user_id]
         
-        # مقداردهی اولیه رزروها برای این کد تغذیه در صورت عدم وجود
-        if feeding_code not in reservations:
-            reservations[feeding_code] = {}
+        # پیدا کردن دانشجو در دیتابیس
+        student = db_session.query(Student).filter_by(feeding_code=feeding_code).first()
         
-        # مقداردهی اولیه رزروها برای این روز در صورت عدم وجود
-        if selected_day not in reservations[feeding_code]:
-            reservations[feeding_code][selected_day] = {}
+        if not student:
+            query.edit_message_text(
+                "\U0001F6AB خطا در بازیابی اطلاعات شما. لطفاً دوباره کد تغذیه خود را ثبت کنید.",
+                reply_markup=InlineKeyboardMarkup([
+                    [InlineKeyboardButton("\U0001F4DD ثبت کد تغذیه", callback_data="register")],
+                    [InlineKeyboardButton("\U0001F519 بازگشت به منوی اصلی", callback_data="back_to_menu")]
+                ])
+            )
+            return
         
         # پردازش رزرو برای تمام وعده‌ها یا یک وعده خاص
         if selected_meal == "all":
             meals = menu_data[selected_day]
+            message_parts = []
+            
             for meal_type, food in meals.items():
-                reservations[feeding_code][selected_day][meal_type] = food
+                # حذف رزرو قبلی اگر وجود داشته باشد
+                db_session.query(Reservation).filter_by(
+                    student_id=student.id,
+                    day=selected_day,
+                    meal_type=meal_type
+                ).delete()
+                
+                # ایجاد رزرو جدید
+                reservation = Reservation(
+                    student_id=student.id,
+                    day=selected_day,
+                    meal_type=meal_type,
+                    food=food
+                )
+                db_session.add(reservation)
+                
+                persian_meal = persian_meals.get(meal_type, meal_type)
+                message_parts.append(f"\U0001F374 {persian_meal}: {food}")
+            
+            db_session.commit()
             
             message = (
                 f"\U00002705 رزرو شما برای تمام وعده‌های روز {persian_days[selected_day]} ثبت شد:\n"
-                f"\U0001F374 صبحانه: {meals['breakfast']}\n"
-                f"\U0001F35C ناهار: {meals['lunch']}\n"
-                f"\U0001F35D شام: {meals['dinner']}\n"
-                f"\U0001F4DD کد تغذیه شما: {feeding_code}"
+                + "\n".join(message_parts) + 
+                f"\n\U0001F4DD کد تغذیه شما: {feeding_code}"
             )
         else:
             food = menu_data[selected_day][selected_meal]
-            reservations[feeding_code][selected_day][selected_meal] = food
+            
+            # حذف رزرو قبلی اگر وجود داشته باشد
+            db_session.query(Reservation).filter_by(
+                student_id=student.id,
+                day=selected_day,
+                meal_type=selected_meal
+            ).delete()
+            
+            # ایجاد رزرو جدید
+            reservation = Reservation(
+                student_id=student.id,
+                day=selected_day,
+                meal_type=selected_meal,
+                food=food
+            )
+            db_session.add(reservation)
+            db_session.commit()
             
             message = (
                 f"\U00002705 رزرو شما برای {persian_meals[selected_meal]} روز {persian_days[selected_day]} ثبت شد:\n"
                 f"\U0001F374 {persian_meals[selected_meal]}: {food}\n"
                 f"\U0001F4DD کد تغذیه شما: {feeding_code}"
             )
-        
-        # ذخیره رزروهای به‌روزرسانی شده
-        save_reservations(reservations)
         
         # ارائه بازخورد و گزینه‌های ناوبری
         query.edit_message_text(
@@ -384,33 +429,25 @@ def handle_callback(update: Update, context: CallbackContext) -> None:
         
         # تجزیه داده‌های تایید
         parts = query.data.split("_")
-        feeding_code = parts[1]
-        selected_day = parts[2]
-        selected_meal = parts[3]
+        reservation_id = int(parts[1])  # شناسه رزرو
         
-        # بررسی اینکه آیا رزرو وجود دارد یا خیر
-        if (feeding_code in reservations and 
-            selected_day in reservations[feeding_code] and 
-            selected_meal in reservations[feeding_code][selected_day]):
+        # پیدا کردن رزرو در دیتابیس
+        reservation = db_session.query(Reservation).filter_by(id=reservation_id).first()
+        
+        if reservation:
+            # دریافت اطلاعات رزرو قبل از حذف
+            student = db_session.query(Student).filter_by(id=reservation.student_id).first()
+            day = persian_days.get(reservation.day, reservation.day)
+            meal = persian_meals.get(reservation.meal_type, reservation.meal_type)
+            food = reservation.food
             
-            # حذف وعده غذایی تحویل داده شده از رزروها
-            food = reservations[feeding_code][selected_day][selected_meal]
-            del reservations[feeding_code][selected_day][selected_meal]
-            
-            # اگر روز دیگر وعده‌ای ندارد، روز را حذف کن
-            if not reservations[feeding_code][selected_day]:
-                del reservations[feeding_code][selected_day]
-                
-            # اگر کد تغذیه دیگر روزی ندارد، کد تغذیه را حذف کن
-            if not reservations[feeding_code]:
-                del reservations[feeding_code]
-                
-            # ذخیره رزروهای به‌روزرسانی شده
-            save_reservations(reservations)
+            # حذف رزرو از دیتابیس
+            db_session.delete(reservation)
+            db_session.commit()
             
             # ارائه پیام تایید
             query.edit_message_text(
-                f"\U00002705 تحویل {persian_meals[selected_meal]} ({food}) برای کد تغذیه {feeding_code} تایید شد."
+                f"\U00002705 تحویل {meal} ({food}) برای کد تغذیه {student.feeding_code} در روز {day} تایید شد."
             )
         else:
             query.edit_message_text(
@@ -435,32 +472,54 @@ def message_handler(update: Update, context: CallbackContext) -> None:
     # مدیر می‌تواند با وارد کردن کد تغذیه رزروها را بررسی کند
     if is_owner(update.effective_user.id):
         code = update.message.text.strip()
-        if code.isdigit() and code in reservations:
-            message = f"<b>\U0001F4C5 رزروهای کد تغذیه {code}:</b>\n\n"
+        if code.isdigit():
+            # پیدا کردن دانشجو با کد تغذیه وارد شده
+            student = db_session.query(Student).filter_by(feeding_code=code).first()
             
-            for day, meals in reservations[code].items():
-                persian_day = persian_days.get(day, day)
-                message += f"<b>\U0001F4C6 روز {persian_day}:</b>\n"
+            if student:
+                # دریافت رزروهای دانشجو
+                reservations = db_session.query(Reservation).filter_by(student_id=student.id).all()
                 
-                # ایجاد دکمه‌های تایید برای هر وعده غذایی
-                keyboard = []
-                for meal, food in meals.items():
-                    persian_meal = persian_meals.get(meal, meal)
-                    message += f"  \U0001F374 {persian_meal}: {food}\n"
-                    keyboard.append([
-                        InlineKeyboardButton(
-                            f"\U00002705 تایید تحویل {persian_meal}",
-                            callback_data=f"confirm_{code}_{day}_{meal}"
-                        )
-                    ])
-                message += "\n"  # افزودن فاصله بین روزها
-                
-                # ارسال پیام با دکمه‌های تایید
-                keyboard.append([InlineKeyboardButton("\U0001F519 بازگشت", callback_data="back_to_menu")])
-                reply_markup = InlineKeyboardMarkup(keyboard)
-                update.message.reply_text(message, parse_mode="HTML", reply_markup=reply_markup)
+                if reservations:
+                    message = f"<b>\U0001F4C5 رزروهای کد تغذیه {code}:</b>\n\n"
+                    
+                    # گروه‌بندی رزروها بر اساس روز
+                    reservations_by_day = {}
+                    for reservation in reservations:
+                        if reservation.day not in reservations_by_day:
+                            reservations_by_day[reservation.day] = []
+                        reservations_by_day[reservation.day].append(reservation)
+                    
+                    # ایجاد دکمه‌های تایید برای هر رزرو
+                    for day, day_reservations in reservations_by_day.items():
+                        persian_day = persian_days.get(day, day)
+                        message += f"<b>\U0001F4C6 روز {persian_day}:</b>\n"
+                        
+                        keyboard = []
+                        for reservation in day_reservations:
+                            persian_meal = persian_meals.get(reservation.meal_type, reservation.meal_type)
+                            message += f"  \U0001F374 {persian_meal}: {reservation.food}\n"
+                            keyboard.append([
+                                InlineKeyboardButton(
+                                    f"\U00002705 تایید تحویل {persian_meal}",
+                                    callback_data=f"confirm_{reservation.id}"
+                                )
+                            ])
+                        
+                        message += "\n"
+                        
+                        # ارسال پیام با دکمه‌های تایید
+                        keyboard.append([InlineKeyboardButton("\U0001F519 بازگشت", callback_data="back_to_menu")])
+                        reply_markup = InlineKeyboardMarkup(keyboard)
+                        update.message.reply_text(message, parse_mode="HTML", reply_markup=reply_markup)
+                        return
+                else:
+                    update.message.reply_text(f"\U0001F6AB رزروی برای کد تغذیه {code} یافت نشد.")
+                    return
+            else:
+                update.message.reply_text(f"\U0001F6AB دانشجویی با کد تغذیه {code} یافت نشد.")
                 return
-        
+    
     # برای کاربران عادی، نمایش پیام راهنما با دستورهای موجود
     update.message.reply_text(
         "برای استفاده از ربات از دستورهای زیر استفاده کنید:\n"
