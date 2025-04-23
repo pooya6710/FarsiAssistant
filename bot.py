@@ -1061,14 +1061,12 @@ def main() -> None:
         entry_points=[
             CommandHandler("register", register_command),
             CallbackQueryHandler(admin_backup_database, pattern="^admin_backup$"),
-            CallbackQueryHandler(pattern="^edit_meal_", callback=lambda u, c: EDIT_MENU_FOOD),
+            CallbackQueryHandler(pattern="^edit_meal_", callback=handle_callback),
         ],
         states={
             FEEDING_CODE: [MessageHandler(Filters.text & ~Filters.command, process_feeding_code)],
-            EDIT_MENU_FOOD: [MessageHandler(Filters.text & ~Filters.command, 
-                lambda u, c: c.user_data.update({'state': EDIT_MENU_FOOD}) or message_handler(u, c))],
-            DATABASE_BACKUP_DESC: [MessageHandler(Filters.text & ~Filters.command, 
-                lambda u, c: c.user_data.update({'state': DATABASE_BACKUP_DESC}) or message_handler(u, c))],
+            EDIT_MENU_FOOD: [MessageHandler(Filters.text & ~Filters.command, message_handler)],
+            DATABASE_BACKUP_DESC: [MessageHandler(Filters.text & ~Filters.command, message_handler)],
         },
         fallbacks=[CommandHandler("cancel", cancel)],
         allow_reentry=True,
