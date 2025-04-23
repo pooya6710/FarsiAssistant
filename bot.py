@@ -44,7 +44,9 @@ persian_meals = {
 }
 
 # لیست شناسه چت مدیران - افرادی که می‌توانند تحویل غذا را تایید کنند
-OWNER_CHAT_IDS = [286420965]  # با شناسه‌های چت واقعی مدیران جایگزین کنید
+# دریافت شناسه‌های مدیران از متغیرهای محیطی یا مقدار پیش‌فرض
+admin_ids_str = os.environ.get("ADMIN_CHAT_IDS", "286420965")
+OWNER_CHAT_IDS = [int(x.strip()) for x in admin_ids_str.split(",") if x.strip().isdigit()]
 
 # وضعیت‌ها برای مدیریت مکالمه
 FEEDING_CODE = 0
@@ -1049,6 +1051,9 @@ def main() -> None:
     if not token:
         logger.error("توکن ربات تلگرام مشخص نشده است. لطفاً در فایل .env آن را تنظیم کنید.")
         return
+    
+    # نمایش وضعیت اتصال ربات
+    logger.info(f"در حال شروع ربات با توکن: {token[:5]}...{token[-5:]}")
     
     # ایجاد Updater
     updater = Updater(token)
