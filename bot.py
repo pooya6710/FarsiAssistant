@@ -3,13 +3,13 @@ import logging
 import json
 import os
 import datetime
-import subprocess
 from dotenv import load_dotenv
 from jdatetime import date as JalaliDate
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, BotCommand
-from telegram.ext import Updater, CommandHandler, CallbackQueryHandler, CallbackContext, MessageHandler, Filters, ConversationHandler
+from telegram.ext import Application, CommandHandler, CallbackQueryHandler, ContextTypes, MessageHandler, filters, ConversationHandler
 import nest_asyncio
 from models import init_db, Student, Reservation, Menu, DatabaseBackup, load_default_menu, migrate_from_json_to_db
+from sqlalchemy import text
 
 # بارگذاری متغیرهای محیطی از فایل .env
 load_dotenv()
@@ -92,7 +92,7 @@ def is_owner(chat_id):
     return chat_id in OWNER_CHAT_IDS
 
 # تابع‌های پردازش دستورها
-def start(update: Update, context: CallbackContext) -> None:
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """شروع کار با ربات و نمایش منوی اصلی"""
     # تنظیم دستورهای ربات برای تجربه کاربری بهتر
     commands = [
@@ -103,12 +103,12 @@ def start(update: Update, context: CallbackContext) -> None:
         BotCommand("help", "راهنما")
     ]
     
-    context.bot.set_my_commands(commands)
+    await context.bot.set_my_commands(commands)
     
     # نمایش پیام خوش‌آمدگویی و منوی اصلی
-    main_menu(update, context)
+    await main_menu(update, context)
 
-def main_menu(update: Update, context: CallbackContext) -> None:
+async def main_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """نمایش منوی اصلی با تمام گزینه‌های موجود"""
     menu_keyboard = [
         [InlineKeyboardButton("\U0001F4D6 مشاهده منو", callback_data="view_menu")],
@@ -132,9 +132,9 @@ def main_menu(update: Update, context: CallbackContext) -> None:
     
     # پردازش هر دو حالت پیام و کالبک کوئری
     if update.message:
-        update.message.reply_text(welcome_message, reply_markup=reply_markup)
+        await update.message.reply_text(welcome_message, reply_markup=reply_markup)
     elif update.callback_query:
-        update.callback_query.edit_message_text(welcome_message, reply_markup=reply_markup)
+        await update.callback_query.edit_message_text(welcome_message, reply_markup=reply_markup)
 
 def help_command(update: Update, context: CallbackContext) -> None:
     """نمایش اطلاعات راهنما"""
@@ -1044,51 +1044,56 @@ def message_handler(update: Update, context: CallbackContext) -> None:
         ])
     )
 
-def main() -> None:
+async def main() -> None:
     """شروع ربات."""
     # دریافت توکن ربات از متغیرهای محیطی
-    token = os.environ.get("TELEGRAM_BOT_TOKEN")
+    token = os.environ.get("TELEGRAM_TOKEN")
     if not token:
-        logger.error("توکن ربات تلگرام مشخص نشده است. لطفاً در فایل .env آن را تنظیم کنید.")
+        logger.error("توکن ربات تلگرام مشخص نشده است. لطفاً متغیر محیطی TELEGRAM_TOKEN را تنظیم کنید.")
         return
     
     # نمایش وضعیت اتصال ربات
     logger.info(f"در حال شروع ربات با توکن: {token[:5]}...{token[-5:]}")
     
-    # ایجاد Updater
-    updater = Updater(token)
+    # ایجاد درخواست‌کننده با تنظیمات مناسب
+    application = Application.builder().token(token).build()
     
-    # دریافت دسترسی به dispatcher
-    dp = updater.dispatcher
-
     # اضافه کردن مدیریت‌کننده مکالمه برای ثبت نام و عملیات مدیریتی
     conv_handler = ConversationHandler(
         entry_points=[
             CommandHandler("register", register_command),
-            CallbackQueryHandler(admin_backup_database, pattern="^admin_backup$"),
-            CallbackQueryHandler(pattern="^edit_meal_", callback=handle_callback),
         ],
         states={
-            FEEDING_CODE: [MessageHandler(Filters.text & ~Filters.command, process_feeding_code)],
-            EDIT_MENU_FOOD: [MessageHandler(Filters.text & ~Filters.command, message_handler)],
-            DATABASE_BACKUP_DESC: [MessageHandler(Filters.text & ~Filters.command, message_handler)],
+            FEEDING_CODE: [MessageHandler(filters.TEXT & ~filters.COMMAND, process_feeding_code)],
+            EDIT_MENU_FOOD: [MessageHandler(filters.TEXT & ~filters.COMMAND, message_handler)],
+            DATABASE_BACKUP_DESC: [MessageHandler(filters.TEXT & ~filters.COMMAND, message_handler)],
         },
         fallbacks=[CommandHandler("cancel", cancel)],
         allow_reentry=True,
     )
-
+    
     # اضافه کردن مدیریت‌کننده‌ها
-    dp.add_handler(CommandHandler("start", start))
-    dp.add_handler(CommandHandler("help", help_command))
-    dp.add_handler(CommandHandler("menu", menu_command))
-    dp.add_handler(CommandHandler("reservations", reservations_command))
-    dp.add_handler(conv_handler)
-    dp.add_handler(CallbackQueryHandler(handle_callback))
-    dp.add_handler(MessageHandler(Filters.text & ~Filters.command, message_handler))
-
+    application.add_handler(CommandHandler("start", start))
+    application.add_handler(CommandHandler("help", help_command))
+    application.add_handler(CommandHandler("menu", menu_command))
+    application.add_handler(CommandHandler("reservations", reservations_command))
+    application.add_handler(conv_handler)
+    application.add_handler(CallbackQueryHandler(handle_callback))
+    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, message_handler))
+    
     # شروع ربات
-    updater.start_polling()
-    updater.idle()
+    await application.initialize()
+    await application.start()
+    await application.updater.start_polling()
+    
+    # اجرای ربات تا زمان خاتمه
+    await application.updater.stop()
+    await application.stop()
 
 if __name__ == "__main__":
-    main()
+    try:
+        asyncio.run(main())
+    except KeyboardInterrupt:
+        logger.info("ربات با دستور کاربر متوقف شد.")
+    except Exception as e:
+        logger.error(f"خطا در اجرای ربات: {e}")
