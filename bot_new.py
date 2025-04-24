@@ -1048,7 +1048,19 @@ async def main() -> None:
     await application.start()
     await application.updater.start_polling()
     
-    # اجرای ربات تا زمان خاتمه
+    logger.info("ربات شروع به کار کرد و آماده پاسخگویی است!")
+    
+    # ربات را در حالت اجرا نگه می‌داریم تا بتواند به پیام‌ها پاسخ دهد
+    try:
+        # به جای توقف، ربات را در حالت اجرا نگه میداریم
+        while True:
+            await asyncio.sleep(3600)  # هر ساعت یکبار چک می‌کنیم
+            logger.info("ربات همچنان در حال اجراست...")
+    except (KeyboardInterrupt, SystemExit):
+        # در صورت درخواست توقف توسط کاربر
+        logger.info("در حال متوقف کردن ربات...")
+        
+    # این خطوط فقط در صورت توقف ربات اجرا می‌شوند
     await application.updater.stop()
     await application.stop()
 
