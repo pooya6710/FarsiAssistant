@@ -540,6 +540,39 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
     elif query.data == "admin_delivery_management":
         await admin_delivery_management(update, context)
         return
+    elif query.data == "admin_clear_reservations":
+        await admin_clear_reservations(update, context)
+        return
+    elif query.data == "confirm_clear_reservations":
+        try:
+            # حذف تمام رزروها از دیتابیس
+            db_session.query(Reservation).delete()
+            db_session.commit()
+            
+            # نمایش پیام موفقیت‌آمیز
+            await query.edit_message_text(
+                "<b>\U00002705 موفقیت‌آمیز:</b>\n\n"
+                "تمام رزروها با موفقیت از سیستم حذف شدند.",
+                parse_mode="HTML",
+                reply_markup=InlineKeyboardMarkup([
+                    [InlineKeyboardButton("\U0001F519 بازگشت به پنل مدیریت", callback_data="admin_panel")]
+                ])
+            )
+        except Exception as e:
+            # در صورت بروز خطا، رولبک کنید
+            db_session.rollback()
+            logger.error(f"خطا در حذف رزروها: {e}")
+            
+            # نمایش پیام خطا
+            await query.edit_message_text(
+                f"<b>\U0001F6AB خطا:</b>\n\n"
+                f"در حذف رزروها خطایی رخ داد: {str(e)}",
+                parse_mode="HTML",
+                reply_markup=InlineKeyboardMarkup([
+                    [InlineKeyboardButton("\U0001F519 بازگشت به پنل مدیریت", callback_data="admin_panel")]
+                ])
+            )
+        return
     
     # پردازش انتخاب روز از منوی غذا
     if query.data.startswith("day_"):
