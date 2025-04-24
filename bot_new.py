@@ -5,7 +5,7 @@ import os
 import datetime
 from dotenv import load_dotenv
 from jdatetime import date as JalaliDate
-from telegram.ext import Updater, CallbackContext, CommandHandler, CallbackQueryHandler, ConversationHandler, MessageHandler, Filters
+from telegram.ext import Application, CallbackContext, CommandHandler, CallbackQueryHandler, ConversationHandler, MessageHandler, filters
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update, BotCommand
 import nest_asyncio
 from models import init_db, Student, Reservation, Menu, DatabaseBackup, load_default_menu, migrate_from_json_to_db
