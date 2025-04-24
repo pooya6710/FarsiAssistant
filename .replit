@@ -28,6 +28,10 @@ args = "python"
 task = "workflow.run"
 args = "ربات تلگرام"
 
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "simple_telegram_bot"
+
 [[workflows.workflow]]
 name = "Start application"
 author = "agent"
@@ -70,6 +74,20 @@ task = "packager.installForAll"
 [[workflows.workflow.tasks]]
 task = "shell.exec"
 args = "python bot_new.py"
+
+[[workflows.workflow]]
+name = "simple_telegram_bot"
+author = "agent"
+
+[workflows.workflow.metadata]
+agentRequireRestartOnSave = false
+
+[[workflows.workflow.tasks]]
+task = "packager.installForAll"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "python simple_bot.py"
 
 [[ports]]
 localPort = 5000
