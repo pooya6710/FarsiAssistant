@@ -1,3 +1,4 @@
+
 aiohappyeyeballs==2.6.1
 aiohttp==3.11.18
 aiohttp-retry==2.9.1
@@ -36,6 +37,7 @@ psycopg2-binary==2.9.10
 pycparser==2.22
 PyJWT==2.10.1
 python-dotenv==1.1.0
+python-telegram-bot>=20.0
 requests==2.32.3
 rfc3986==1.5.0
 sniffio==1.3.1
@@ -49,5 +51,4 @@ yarl==1.20.0
 jdatetime
 nest-asyncio
 python-dotenv
-python-telegram-bot==13.7
 telegram
