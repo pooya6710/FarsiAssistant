@@ -49,3 +49,5 @@ yarl==1.20.0
 jdatetime
 nest-asyncio
 python-dotenv
+python-telegram-bot==13.7
+telegram
