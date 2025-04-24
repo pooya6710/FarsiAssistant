@@ -1,0 +1,105 @@
+Traceback (most recent call last):
+
+  File "/app/main.py", line 6, in <module>
+
+    from bot_new import main as bot_main
+
+  File "/app/bot_new.py", line 59, in <module>
+
+    db_session = init_db()
+
+                 ^^^^^^^^^
+
+  File "/app/models.py", line 72, in init_db
+
+    engine = create_engine(database_url)
+
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+  File "<string>", line 2, in create_engine
+
+  File "/opt/venv/lib/python3.11/site-packages/sqlalchemy/util/deprecations.py", line 281, in warned
+
+    return fn(*args, **kwargs)  # type: ignore[no-any-return]
+
+           ^^^^^^^^^^^^^^^^^^^
+
+  File "/opt/venv/lib/python3.11/site-packages/sqlalchemy/engine/create.py", line 549, in create_engine
+
+    u = _url.make_url(url)
+
+        ^^^^^^^^^^^^^^^^^^
+
+  File "/opt/venv/lib/python3.11/site-packages/sqlalchemy/engine/url.py", line 860, in make_url
+
+    raise exc.ArgumentError(
+
+sqlalchemy.exc.ArgumentError: Expected string or URL object, got None
+
+Traceback (most recent call last):
+
+  File "/app/main.py", line 6, in <module>
+
+    from bot_new import main as bot_main
+
+  File "/app/bot_new.py", line 59, in <module>
+
+    db_session = init_db()
+
+                 ^^^^^^^^^
+
+  File "/app/models.py", line 72, in init_db
+
+    engine = create_engine(database_url)
+
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+  File "<string>", line 2, in create_engine
+
+  File "/opt/venv/lib/python3.11/site-packages/sqlalchemy/util/deprecations.py", line 281, in warned
+
+    raise exc.ArgumentError(
+
+    return fn(*args, **kwargs)  # type: ignore[no-any-return]
+
+           ^^^^^^^^^^^^^^^^^^^
+
+sqlalchemy.exc.ArgumentError: Expected string or URL object, got None
+
+  File "/opt/venv/lib/python3.11/site-packages/sqlalchemy/engine/create.py", line 549, in create_engine
+
+    u = _url.make_url(url)
+
+        ^^^^^^^^^^^^^^^^^^
+
+  File "/opt/venv/lib/python3.11/site-packages/sqlalchemy/engine/url.py", line 860, in make_url
+
+Traceback (most recent call last):
+
+  File "/app/main.py", line 6, in <module>
+
+    from bot_new import main as bot_main
+
+  File "/app/bot_new.py", line 59, in <module>
+
+    db_session = init_db()
+
+                 ^^^^^^^^^
+
+  File "/app/models.py", line 72, in init_db
+
+    engine = create_engine(database_url)
+
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+  File "<string>", line 2, in create_engine
+
+  File "/opt/venv/lib/python3.11/site-packages/sqlalchemy/util/deprecations.py", line 281, in warned
+
+    return fn(*args, **kwargs)  # type: ignore[no-any-return]
+
+           ^^^^^^^^^^^^^^^^^^^
+
+  File "/opt/venv/lib/python3.11/site-packages/sqlalchemy/engine/create.py", line 549, in create_engine
+
+    u = _url.make_url(url)
