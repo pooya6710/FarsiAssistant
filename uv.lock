@@ -747,7 +747,6 @@ dependencies = [
     { name = "python-dotenv" },
     { name = "python-telegram-bot" },
     { name = "sqlalchemy" },
-    { name = "telegram" },
     { name = "twilio" },
 ]
 
@@ -760,9 +759,8 @@ requires-dist = [
     { name = "nest-asyncio", specifier = ">=1.6.0" },
     { name = "psycopg2-binary", specifier = ">=2.9.10" },
     { name = "python-dotenv", specifier = ">=1.1.0" },
-    { name = "python-telegram-bot", extras = ["job-queue"], specifier = "==13.7" },
+    { name = "python-telegram-bot", specifier = "==13.7" },
     { name = "sqlalchemy", specifier = ">=2.0.40" },
-    { name = "telegram", specifier = ">=0.0.1" },
     { name = "twilio", specifier = ">=9.5.2" },
 ]
 
@@ -835,12 +833,6 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/1c/cb/f38c61f7f2fd4d10494c1c135ff6a6ddb63508d0b47bccccd93670637309/sqlalchemy-2.0.40-cp313-cp313-win_amd64.whl", hash = "sha256:641ee2e0834812d657862f3a7de95e0048bdcb6c55496f39c6fa3d435f6ac6ad", size = 2104564 },
     { url = "https://files.pythonhosted.org/packages/d1/7c/5fc8e802e7506fe8b55a03a2e1dab156eae205c91bee46305755e086d2e2/sqlalchemy-2.0.40-py3-none-any.whl", hash = "sha256:32587e2e1e359276957e6fe5dad089758bc042a971a8a09ae8ecf7a8fe23d07a", size = 1903894 },
 ]
-
-[[package]]
-name = "telegram"
-version = "0.0.1"
-source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/9d/ca/8bdf2deb93b9f6971dabf2ddc827c2a98ce23e13582a15b37e9bc169f226/telegram-0.0.1.tar.gz", hash = "sha256:d405a0af4c868a8dbeae6d03e297e21c7ee6269e11e2ed3810e15544aba02591", size = 879 }
 
 [[package]]
 name = "tornado"
