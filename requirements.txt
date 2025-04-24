@@ -53,3 +53,5 @@ nest-asyncio
 python-dotenv
 telegram
 pytz
+gunicorn
+psycopg2-binary
