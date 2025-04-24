@@ -9,7 +9,7 @@ deploymentTarget = "autoscale"
 run = ["sh", "-c", "python bot_new.py"]
 
 [workflows]
-runButton = "Telegram Bot"
+runButton = "Run Bot"
 
 [[workflows.workflow]]
 name = "Project"
@@ -97,6 +97,15 @@ mode = "sequential"
 [[workflows.workflow.tasks]]
 task = "shell.exec"
 args = "python bot_new.py"
+
+[[workflows.workflow]]
+name = "Run Bot"
+author = 40648759
+mode = "sequential"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "python main.py"
 
 [[ports]]
 localPort = 5000
