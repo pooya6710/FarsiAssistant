@@ -52,3 +52,4 @@ jdatetime
 nest-asyncio
 python-dotenv
 telegram
+pytz
