@@ -1009,7 +1009,7 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
 async def main() -> None:
     """شروع ربات."""
     # دریافت توکن ربات از متغیرهای محیطی
-    token = os.environ.get("TELEGRAM_BOT_TOKEN")
+    token = os.environ.get("TELEGRAM_TOKEN")
     if not token:
         logger.error("توکن ربات تلگرام مشخص نشده است. لطفاً در فایل .env آن را تنظیم کنید.")
         return
