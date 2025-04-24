@@ -108,7 +108,7 @@ async def start(update: Update, context: CallbackContext) -> None:
     # نمایش پیام خوش‌آمدگویی و منوی اصلی
     await main_menu(update, context)
 
-async def main_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+async def main_menu(update: Update, context: CallbackContext) -> None:
     """نمایش منوی اصلی با تمام گزینه‌های موجود"""
     menu_keyboard = [
         [InlineKeyboardButton("\U0001F4D6 مشاهده منو", callback_data="view_menu")],
@@ -136,7 +136,7 @@ async def main_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     elif update.callback_query:
         await update.callback_query.edit_message_text(welcome_message, reply_markup=reply_markup)
 
-async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+async def help_command(update: Update, context: CallbackContext) -> None:
     """نمایش اطلاعات راهنما"""
     help_text = (
         "\U0001F4DA <b>راهنمای سامانه رزرو غذا:</b>\n\n"
@@ -156,14 +156,14 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         await update.callback_query.answer()
         await update.callback_query.edit_message_text(help_text, parse_mode="HTML", reply_markup=reply_markup)
 
-async def register_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+async def register_command(update: Update, context: CallbackContext) -> int:
     """شروع فرآیند ثبت کد تغذیه"""
     await update.message.reply_text(
         "\U0001F4DD لطفاً کد تغذیه خود را ارسال کنید:"
     )
     return FEEDING_CODE
 
-async def process_feeding_code(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+async def process_feeding_code(update: Update, context: CallbackContext) -> int:
     """پردازش کد تغذیه وارد شده توسط کاربر"""
     code = update.message.text.strip()
     
@@ -229,7 +229,7 @@ async def process_feeding_code(update: Update, context: ContextTypes.DEFAULT_TYP
         )
         return FEEDING_CODE
 
-async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+async def cancel(update: Update, context: CallbackContext) -> int:
     """لغو مکالمه"""
     await update.message.reply_text(
         "\U0001F6AB عملیات لغو شد. بازگشت به منوی اصلی...",
@@ -239,7 +239,7 @@ async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     )
     return ConversationHandler.END
 
-async def view_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+async def view_menu(update: Update, context: CallbackContext) -> None:
     """نمایش منوی هفتگی با دکمه‌های انتخاب روز"""
     days_keyboard = [
         [InlineKeyboardButton(f"\U0001F4C6 {persian_days[day]}", callback_data=f"day_{day}")] 
@@ -260,7 +260,7 @@ async def view_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
             reply_markup=reply_markup
         )
 
-async def show_reservations(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+async def show_reservations(update: Update, context: CallbackContext) -> None:
     """نمایش رزروهای فعلی کاربر"""
     user_id = str(update.effective_user.id)
     
@@ -316,7 +316,7 @@ async def show_reservations(update: Update, context: ContextTypes.DEFAULT_TYPE) 
     else:
         await update.message.reply_text(message, parse_mode="HTML", reply_markup=reply_markup)
 
-async def admin_panel(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+async def admin_panel(update: Update, context: CallbackContext) -> None:
     """نمایش پنل مدیریت برای مدیران سیستم"""
     chat_id = update.effective_chat.id
     
@@ -348,7 +348,7 @@ async def admin_panel(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
     else:
         await update.message.reply_text(message, parse_mode="HTML", reply_markup=reply_markup)
 
-async def admin_menu_management(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+async def admin_menu_management(update: Update, context: CallbackContext) -> None:
     """مدیریت منوی غذای هفتگی"""
     if not is_owner(update.effective_chat.id):
         return
@@ -367,7 +367,7 @@ async def admin_menu_management(update: Update, context: ContextTypes.DEFAULT_TY
         reply_markup=reply_markup
     )
 
-async def admin_users_list(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+async def admin_users_list(update: Update, context: CallbackContext) -> None:
     """نمایش لیست کاربران ثبت‌نام شده"""
     if not is_owner(update.effective_chat.id):
         return
@@ -396,7 +396,7 @@ async def admin_users_list(update: Update, context: ContextTypes.DEFAULT_TYPE) -
         reply_markup=reply_markup
     )
 
-async def admin_backup_database(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+async def admin_backup_database(update: Update, context: CallbackContext) -> int:
     """تهیه نسخه پشتیبان از دیتابیس"""
     if not is_owner(update.effective_chat.id):
         return ConversationHandler.END
@@ -413,7 +413,7 @@ async def admin_backup_database(update: Update, context: ContextTypes.DEFAULT_TY
     
     return DATABASE_BACKUP_DESC
 
-async def create_database_backup(description, chat_id, context: ContextTypes.DEFAULT_TYPE) -> None:
+async def create_database_backup(description, chat_id, context: CallbackContext) -> None:
     """ایجاد فایل پشتیبان از دیتابیس"""
     try:
         timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -455,7 +455,7 @@ async def create_database_backup(description, chat_id, context: ContextTypes.DEF
             ])
         )
 
-async def admin_clear_reservations(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+async def admin_clear_reservations(update: Update, context: CallbackContext) -> None:
     """حذف تمام رزروهای موجود در سیستم"""
     if not is_owner(update.effective_chat.id):
         return
@@ -476,7 +476,7 @@ async def admin_clear_reservations(update: Update, context: ContextTypes.DEFAULT
         reply_markup=reply_markup
     )
 
-async def admin_delivery_management(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+async def admin_delivery_management(update: Update, context: CallbackContext) -> None:
     """مدیریت تحویل غذا و مشاهده رزروها"""
     if not is_owner(update.effective_chat.id):
         return
@@ -500,7 +500,7 @@ async def admin_delivery_management(update: Update, context: ContextTypes.DEFAUL
         reply_markup=reply_markup
     )
 
-async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+async def handle_callback(update: Update, context: CallbackContext) -> None:
     """پردازش کالبک کوئری‌ها از کیبوردهای درون خطی"""
     query = update.callback_query
     await query.answer()  # پاسخ به کالبک کوئری برای توقف نشانگر بارگذاری
@@ -790,7 +790,7 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
             )
         return
 
-async def reserve_all_meals(update: Update, context: ContextTypes.DEFAULT_TYPE, selected_day: str) -> None:
+async def reserve_all_meals(update: Update, context: CallbackContext, selected_day: str) -> None:
     """رزرو تمام وعده‌های یک روز"""
     user_id = str(update.effective_user.id)
     if user_id not in students:
@@ -857,7 +857,7 @@ async def reserve_all_meals(update: Update, context: ContextTypes.DEFAULT_TYPE, 
         ])
     )
 
-async def reserve_meal(update: Update, context: ContextTypes.DEFAULT_TYPE, selected_day: str, selected_meal: str) -> None:
+async def reserve_meal(update: Update, context: CallbackContext, selected_day: str, selected_meal: str) -> None:
     """رزرو یک وعده غذایی خاص"""
     user_id = str(update.effective_user.id)
     if user_id not in students:
@@ -922,15 +922,15 @@ async def reserve_meal(update: Update, context: ContextTypes.DEFAULT_TYPE, selec
         ])
     )
 
-async def menu_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+async def menu_command(update: Update, context: CallbackContext) -> None:
     """پردازش دستور /menu"""
     await view_menu(update, context)
 
-async def reservations_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+async def reservations_command(update: Update, context: CallbackContext) -> None:
     """پردازش دستور /reservations"""
     await show_reservations(update, context)
 
-async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+async def message_handler(update: Update, context: CallbackContext) -> None:
     """پردازش پیام‌های متنی خارج از مکالمه‌ها"""
     # بررسی اینکه آیا مدیر داخل بخش جستجو با کد تغذیه است
     user_id = update.effective_user.id
