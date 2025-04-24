@@ -136,7 +136,7 @@ async def main_menu(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     elif update.callback_query:
         await update.callback_query.edit_message_text(welcome_message, reply_markup=reply_markup)
 
-def help_command(update: Update, context: CallbackContext) -> None:
+async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """نمایش اطلاعات راهنما"""
     help_text = (
         "\U0001F4DA <b>راهنمای سامانه رزرو غذا:</b>\n\n"
@@ -151,18 +151,19 @@ def help_command(update: Update, context: CallbackContext) -> None:
     reply_markup = InlineKeyboardMarkup(back_button)
     
     if update.message:
-        update.message.reply_text(help_text, parse_mode="HTML", reply_markup=reply_markup)
+        await update.message.reply_text(help_text, parse_mode="HTML", reply_markup=reply_markup)
     elif update.callback_query:
-        update.callback_query.edit_message_text(help_text, parse_mode="HTML", reply_markup=reply_markup)
+        await update.callback_query.answer()
+        await update.callback_query.edit_message_text(help_text, parse_mode="HTML", reply_markup=reply_markup)
 
-def register_command(update: Update, context: CallbackContext) -> int:
+async def register_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """شروع فرآیند ثبت کد تغذیه"""
-    update.message.reply_text(
+    await update.message.reply_text(
         "\U0001F4DD لطفاً کد تغذیه خود را ارسال کنید:"
     )
     return FEEDING_CODE
 
-def process_feeding_code(update: Update, context: CallbackContext) -> int:
+async def process_feeding_code(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """پردازش کد تغذیه وارد شده توسط کاربر"""
     code = update.message.text.strip()
     
@@ -185,7 +186,7 @@ def process_feeding_code(update: Update, context: CallbackContext) -> int:
         # به‌روزرسانی کش
         students[user_id] = code
         
-        update.message.reply_text(
+        await update.message.reply_text(
             f"\U00002705 کد تغذیه شما ({code}) با موفقیت ثبت شد!\n"
             "\U0001F4D1 بازگشت به منوی اصلی:",
             reply_markup=InlineKeyboardMarkup([
@@ -194,14 +195,14 @@ def process_feeding_code(update: Update, context: CallbackContext) -> int:
         )
         return ConversationHandler.END
     else:
-        update.message.reply_text(
+        await update.message.reply_text(
             "\U0001F6AB کد تغذیه باید فقط شامل اعداد باشد. لطفاً دوباره تلاش کنید."
         )
         return FEEDING_CODE
 
-def cancel(update: Update, context: CallbackContext) -> int:
+async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """لغو مکالمه"""
-    update.message.reply_text(
+    await update.message.reply_text(
         "\U0001F6AB عملیات لغو شد. بازگشت به منوی اصلی...",
         reply_markup=InlineKeyboardMarkup([
             [InlineKeyboardButton("\U0001F4D1 منوی اصلی", callback_data="back_to_menu")]
