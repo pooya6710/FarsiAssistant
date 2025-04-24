@@ -170,30 +170,59 @@ async def process_feeding_code(update: Update, context: ContextTypes.DEFAULT_TYP
     if code.isdigit():
         user_id = str(update.effective_user.id)
         
-        # بررسی اینکه آیا دانشجو قبلاً در دیتابیس وجود دارد
-        student = db_session.query(Student).filter_by(user_id=user_id).first()
-        
-        if student:
-            # به‌روزرسانی کد تغذیه دانشجو
-            student.feeding_code = code
-        else:
-            # ایجاد دانشجوی جدید
-            student = Student(user_id=user_id, feeding_code=code)
-            db_session.add(student)
-        
-        db_session.commit()
-        
-        # به‌روزرسانی کش
-        students[user_id] = code
-        
-        await update.message.reply_text(
-            f"\U00002705 کد تغذیه شما ({code}) با موفقیت ثبت شد!\n"
-            "\U0001F4D1 بازگشت به منوی اصلی:",
-            reply_markup=InlineKeyboardMarkup([
-                [InlineKeyboardButton("\U0001F4D1 منوی اصلی", callback_data="back_to_menu")]
-            ])
-        )
-        return ConversationHandler.END
+        try:
+            # بررسی اینکه آیا دانشجو قبلاً در دیتابیس وجود دارد
+            student = db_session.query(Student).filter_by(user_id=user_id).first()
+            
+            # بررسی اینکه آیا کد تغذیه توسط کاربر دیگری استفاده شده‌است
+            existing_code = db_session.query(Student).filter(Student.feeding_code == code, Student.user_id != user_id).first()
+            if existing_code:
+                await update.message.reply_text(
+                    f"\U0001F6AB این کد تغذیه قبلاً توسط کاربر دیگری ثبت شده است. لطفاً کد دیگری وارد کنید."
+                )
+                return FEEDING_CODE
+            
+            if student:
+                # به‌روزرسانی کد تغذیه دانشجو
+                student.feeding_code = code
+                # در صورت بروز خطای rollback، وضعیت را بازنشانی می‌کنیم
+                db_session.commit()
+            else:
+                # ایجاد دانشجوی جدید
+                student = Student(user_id=user_id, feeding_code=code)
+                db_session.add(student)
+                try:
+                    db_session.commit()
+                except Exception as e:
+                    db_session.rollback()
+                    logger.error(f"خطا در ثبت دانشجو: {e}")
+                    
+                    # تلاش مجدد با به‌روزرسانی رکورد موجود
+                    existing_student = db_session.query(Student).filter_by(feeding_code=code).first()
+                    if existing_student:
+                        existing_student.user_id = user_id
+                        db_session.commit()
+            
+            # به‌روزرسانی کش
+            students[user_id] = code
+            
+            await update.message.reply_text(
+                f"\U00002705 کد تغذیه شما ({code}) با موفقیت ثبت شد!\n"
+                "\U0001F4D1 بازگشت به منوی اصلی:",
+                reply_markup=InlineKeyboardMarkup([
+                    [InlineKeyboardButton("\U0001F4D1 منوی اصلی", callback_data="back_to_menu")]
+                ])
+            )
+            return ConversationHandler.END
+            
+        except Exception as e:
+            db_session.rollback()
+            logger.error(f"خطا در پردازش کد تغذیه: {e}")
+            
+            await update.message.reply_text(
+                "\U0001F6AB خطایی در ثبت کد تغذیه رخ داد. لطفاً دوباره تلاش کنید یا با پشتیبانی تماس بگیرید."
+            )
+            return FEEDING_CODE
     else:
         await update.message.reply_text(
             "\U0001F6AB کد تغذیه باید فقط شامل اعداد باشد. لطفاً دوباره تلاش کنید."
@@ -306,6 +335,7 @@ async def admin_panel(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
         [InlineKeyboardButton("\U0001F464 لیست کاربران", callback_data="admin_users_list")],
         [InlineKeyboardButton("\U0001F4BE پشتیبان‌گیری از دیتابیس", callback_data="admin_backup")],
         [InlineKeyboardButton("\U0001F4E6 مدیریت تحویل غذا", callback_data="admin_delivery_management")],
+        [InlineKeyboardButton("\U0001F5D1 حذف همه رزروها", callback_data="admin_clear_reservations")],
         [InlineKeyboardButton("\U0001F519 بازگشت به منوی اصلی", callback_data="back_to_menu")]
     ]
     reply_markup = InlineKeyboardMarkup(admin_keyboard)
@@ -424,6 +454,27 @@ async def create_database_backup(description, chat_id, context: ContextTypes.DEF
                 [InlineKeyboardButton("\U0001F519 بازگشت به پنل مدیریت", callback_data="admin_panel")]
             ])
         )
+
+async def admin_clear_reservations(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """حذف تمام رزروهای موجود در سیستم"""
+    if not is_owner(update.effective_chat.id):
+        return
+    
+    # نمایش پیام تایید
+    confirm_keyboard = [
+        [InlineKeyboardButton("\U00002705 بله، همه رزروها حذف شوند", callback_data="confirm_clear_reservations")],
+        [InlineKeyboardButton("\U0001F6AB خیر، انصراف", callback_data="admin_panel")]
+    ]
+    reply_markup = InlineKeyboardMarkup(confirm_keyboard)
+    
+    await update.callback_query.answer()
+    await update.callback_query.edit_message_text(
+        "<b>\U0001F5D1 حذف تمام رزروها</b>\n\n"
+        "\U0001F6A8 <b>هشدار:</b> این عملیات غیرقابل بازگشت است و تمام رزروهای ثبت شده در سیستم حذف خواهند شد.\n\n"
+        "آیا از حذف تمام رزروها اطمینان دارید؟",
+        parse_mode="HTML",
+        reply_markup=reply_markup
+    )
 
 async def admin_delivery_management(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """مدیریت تحویل غذا و مشاهده رزروها"""
