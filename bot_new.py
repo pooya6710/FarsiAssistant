@@ -5,8 +5,8 @@ import os
 import datetime
 from dotenv import load_dotenv
 from jdatetime import date as JalaliDate
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, BotCommand
-from telegram.ext import Application, CommandHandler, CallbackQueryHandler, ContextTypes, MessageHandler, filters, ConversationHandler
+from telegram.ext import Updater, CallbackContext, CommandHandler, CallbackQueryHandler, ConversationHandler, MessageHandler, Filters
+from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update, BotCommand
 import nest_asyncio
 from models import init_db, Student, Reservation, Menu, DatabaseBackup, load_default_menu, migrate_from_json_to_db
 from sqlalchemy import text
@@ -92,7 +92,7 @@ def is_owner(chat_id):
     return chat_id in OWNER_CHAT_IDS
 
 # تابع‌های پردازش دستورها
-async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+async def start(update: Update, context: CallbackContext) -> None:
     """شروع کار با ربات و نمایش منوی اصلی"""
     # تنظیم دستورهای ربات برای تجربه کاربری بهتر
     commands = [
